@@ -1,0 +1,30 @@
+{
+  "name": "k-data-x402",
+  "version": "0.1.0",
+  "private": true,
+  "description": "K-Data x402 API — Korean market data for AI agents, paid per request via x402 (USDC on Base)",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "test:agent": "node --experimental-strip-types test/agent-client.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@x402/core": "~2.20.0",
+    "@x402/evm": "~2.20.0",
+    "@x402/extensions": "~2.20.0",
+    "@x402/hono": "~2.20.0",
+    "@x402/mcp": "~2.20.0",
+    "@x402/svm": "~2.20.0",
+    "fast-xml-parser": "^5.0.0",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260730.1",
+    "@x402/fetch": "~2.20.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.0.0"
+  }
+}

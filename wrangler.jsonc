@@ -1,0 +1,50 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "k-data-x402",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // Dev defaults: Base Sepolia testnet + free x402.org facilitator.
+  // Production values are set in the "production" environment below.
+  "vars": {
+    "NETWORK": "eip155:84532",
+    "PAY_TO": "0x0000000000000000000000000000000000000001",
+    "FACILITATOR_URL": "https://x402.org/facilitator",
+    "SERVICE_URL": "http://localhost:8787"
+  },
+  "d1_databases": [
+    {
+      "binding": "ARCHIVE",
+      "database_name": "k-data-archive",
+      "database_id": "0f859ed4-50ab-49cc-a590-a7a06943a442"
+    }
+  ],
+  "ai": { "binding": "AI" },
+  "observability": { "enabled": true },
+  "env": {
+    "production": {
+      "vars": {
+        // Base mainnet. PAY_TO must be set to your real wallet before deploy.
+        "NETWORK": "eip155:8453",
+        "PAY_TO": "0x519c79c7EB7566F7353a324472A5CE4f05330C81",
+        "SERVICE_URL": "https://k-data-x402-production.theblack1022.workers.dev"
+        // CDP facilitator is used automatically when secrets are present:
+        //   wrangler secret put CDP_API_KEY_ID --env production
+        //   wrangler secret put CDP_API_KEY_SECRET --env production
+      },
+      // Bindings are NOT inherited by named environments — repeat them here.
+      "d1_databases": [
+        {
+          "binding": "ARCHIVE",
+          "database_name": "k-data-archive",
+          "database_id": "0f859ed4-50ab-49cc-a590-a7a06943a442"
+        }
+      ],
+      "ai": { "binding": "AI" },
+      "observability": { "enabled": true },
+      // Snapshot the premium every 5 minutes. The archive is the moat: no
+      // competitor sells history, and every skipped interval is gone for good.
+      "triggers": { "crons": ["*/5 * * * *"] }
+    }
+  }
+}
