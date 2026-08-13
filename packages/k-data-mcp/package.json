@@ -1,6 +1,8 @@
 {
   "name": "k-data-mcp",
   "version": "0.1.0",
+  "//": "Read-only mirror. What ships to npm is built and published from github.com/juh5ng/k-data-mcp, which is why this copy lags (npm is ahead of the 0.1.0 above). private:true so an accidental `npm publish` here fails instead of shipping a tarball with no dist/.",
+  "private": true,
   "description": "MCP server for Korean market data — kimchi premium on a tradeable USDT basis, premium history and percentiles, Korean news translated to English. Pays per call in USDC via x402; no account or API key.",
   "keywords": [
     "mcp",
