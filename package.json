@@ -19,7 +19,7 @@
     "@x402/mcp": "~2.20.0",
     "@x402/svm": "~2.20.0",
     "fast-xml-parser": "^5.0.0",
-    "hono": "^4.7.0",
+    "hono": "^4.13.2",
     "node-html-parser": "^7.1.0"
   },
   "devDependencies": {

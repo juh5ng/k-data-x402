@@ -2,9 +2,9 @@
 
 에이전트 유입 경로별 제출 내용입니다. **계정 로그인이 필요한 곳은 직접 제출하셔야 합니다** — 아래는 그대로 붙여넣을 수 있게 준비한 원고입니다.
 
-제출 전에 해야 할 것:
-1. GitHub 공개 레포 생성 (예: `k-data-mcp`) 후 `packages/k-data-mcp/` 내용 푸시
-2. `npm publish` (npm 계정 필요)
+제출 전에 해야 할 것 (모두 완료):
+1. GitHub 공개 레포 [juh5ng/k-data-mcp](https://github.com/juh5ng/k-data-mcp) — 배포되는 패키지의 소스는 **그 레포**이지 이 저장소의 `packages/k-data-mcp/`가 아닙니다. 이쪽은 읽기 전용 미러라 `private: true`로 막아두었습니다.
+2. `npm publish` — 그 레포를 clone해 `npm install && npm run build` 후 배포. 빌드를 건너뛰면 `dist/`가 빠진 채 올라가 `npx k-data-mcp`가 즉시 깨집니다. (현재 npm: 0.2.0)
 3. [server.json](packages/k-data-mcp/server.json)의 `REPLACE_WITH_YOUR_GITHUB_USERNAME` 두 곳 교체 (완료: juh5ng)
 
 ---
@@ -13,12 +13,32 @@
 
 다른 디렉토리와 클라이언트가 여기를 피드로 읽으므로 **가장 먼저** 등록합니다.
 
-```bash
-npx @modelcontextprotocol/publisher login github
+The publisher is a Go binary from the registry's GitHub releases — **not** an npm
+package. `@modelcontextprotocol/publisher` does not exist, and the unrelated
+`mcp-publisher` package on npm is a third-party browser-automation tool: do not
+run it.
+
+Download it into the package checkout (Windows PowerShell):
+
+```powershell
+$arch = if ([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq "Arm64") { "arm64" } else { "amd64" }; Invoke-WebRequest -Uri "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_windows_$arch.tar.gz" -OutFile "mcp-publisher.tar.gz"; tar xf mcp-publisher.tar.gz mcp-publisher.exe; rm mcp-publisher.tar.gz
 ```
 
-```bash
-npx @modelcontextprotocol/publisher publish packages/k-data-mcp/server.json
+On macOS or Linux, `brew install mcp-publisher` does the same.
+
+It reads `server.json` from the working directory, so run these from the package
+checkout rather than passing a path:
+
+```powershell
+.\mcp-publisher.exe validate
+```
+
+```powershell
+.\mcp-publisher.exe login github
+```
+
+```powershell
+.\mcp-publisher.exe publish
 ```
 
 네임스페이스(`io.github.juh5ng/k-data-mcp`)는 GitHub 계정 소유 증명으로 확보됩니다.
