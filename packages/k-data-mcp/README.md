@@ -55,11 +55,11 @@ Each tool call spends real USDC, so the server will not start without a key and 
 | `list_endpoints` | free | Catalog, current prices, wallet address, remaining budget |
 | `kimchi_premium` | $0.03 | Dual-basis premium (official + USDT) for up to 10 coins |
 | `kimchi_premium_stats` | $0.12 | Percentile, mean, stdev, z-score of the premium over 1h–90d |
+| `kimchi_premium_history` | $0.08 | Premium time series, both bases |
+| `korea_market_snapshot` | $0.08 | One-call briefing: premium + markets + FX + translated headlines |
 | `research_consensus_ticker` | $0.12 | Analyst consensus per KRX ticker — target price mean/median/range, rating mix, and every house's revision history |
 | `research_company_ticker` | $0.05 | Archived Korean brokerage reports for one ticker, with English summaries |
 | `research_latest` | $0.02 | Latest Korean equity research across all covered companies, summarised in English |
-| `kimchi_premium_history` | $0.08 | Premium time series, both bases |
-| `korea_market_snapshot` | $0.08 | One-call briefing: premium + markets + FX + translated headlines |
 | `news_headlines_en` | $0.05 | Korean headlines with English translations |
 | `crypto_krw_markets` | $0.01 | All Upbit KRW markets — volume leaders, gainers, losers |
 | `news_headlines` | $0.01 | Korean headlines, untranslated |
