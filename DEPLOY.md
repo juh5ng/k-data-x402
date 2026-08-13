@@ -144,3 +144,26 @@ $env:EVM_PRIVATE_KEY="0xYOUR_BUYER_KEY"; node .wrangler/agent.mjs https://k-data
 - **엔드포인트 추가**: `src/catalog.ts`의 `ENDPOINTS`에 항목을 추가하고 `src/index.ts`에 핸들러를 하나 붙이면 됩니다.
 - **원화 현금화**: 수취한 USDC는 본인 명의 국내 거래소를 통해야 합니다(규제상 사용자 영역).
 - **업스트림 rate limit**: 인메모리 TTL 캐시(시세 10초, 마켓 30초, 뉴스 5분, 환율 10분)로 완화돼 있습니다.
+
+### 리서치 아카이브 운영
+
+- **cron 2개**: `*/5 * * * *`(프리미엄 스냅샷)과 `7 * * * *`(리서치 수집). `scheduled()`가 `event.cron`으로 분기하며,
+  분 7은 두 작업이 같은 순간에 겹치지 않게 하려고 고른 값입니다. 둘 다 production 환경에만 설정돼 있습니다.
+- **로컬 검증 불가**: `wrangler dev`에서는 `ctx.waitUntil` 작업이 실행되지 않습니다(README의 Workers 특이사항 참고).
+  틱을 확인하려면 배포 후 `wrangler tail --env production` 또는 D1을 직접 조회하세요.
+
+  ```bash
+  npx wrangler d1 execute k-data-archive --remote --command "SELECT count(*) total, sum(processed) done, max(published_date) newest FROM research_reports"
+  ```
+
+- **처리량**: 틱당 목록 1~2페이지 fetch + 미처리분 10건 번역·요약(모델 호출 20회). 유입은 영업일 기준 50~150건,
+  드레인은 240건/일이라 백로그는 자연 해소됩니다. 요약은 수집 시 1회만 생성해 D1에 저장하므로
+  **유료 요청은 모델을 호출하지 않습니다**(D1 SELECT만).
+- **파서 드리프트 경보**: 목록은 HTML 파싱이라 마크업이 바뀌면 깨집니다. 로그에 `research: inserted 0`이
+  계속 찍히거나 스모크 테스트의 `RESEARCH: rows=0`이 나오면 파서를 손봐야 한다는 신호입니다.
+  이 경우에도 유료 엔드포인트는 D1만 읽으므로 500이 아니라 "아카이브 정지"로만 나타납니다.
+- **수집 태도(중요)**: 출처 사이트의 robots.txt는 전면 크롤링 금지입니다. 그래서 (1) 시간당 1회·틱당 최대 2페이지,
+  (2) 연락처가 포함된 정직한 User-Agent, (3) **PDF는 받지도 저장하지도 재배포하지도 않고** 사실 데이터와
+  자체 작성 영어 요약만 판매, (4) 모든 응답에 발행처를 가리키는 `source_url` 첨부 — 이 네 가지를 지킵니다.
+  이는 문서화된 수용 리스크이며, 출처 측에서 중단 요청이 오면 즉시 cron을 내리세요
+  (`wrangler.jsonc`의 `triggers.crons`에서 `7 * * * *` 제거 후 재배포).

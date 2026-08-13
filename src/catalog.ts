@@ -24,6 +24,7 @@ export const SERVICE_EDGE = [
   "Dual-basis kimchi premium: the official USD/KRW figure everyone quotes, plus the Upbit KRW/USDT basis that an arbitrageur can actually realize. The two often disagree in sign — official can read negative while the tradeable basis is positive.",
   "Premium history and percentile context, continuously archived. No free source and no competing x402 seller offers this; it cannot be reconstructed after the fact.",
   "Korean headlines translated to English, so a non-Korean agent can actually use them.",
+  "Korean sell-side research as structured data: target prices, ratings and revision history per KRX ticker, summarised in English. The listing site shows a rolling recent window only, so the analyst consensus series is archived here and nowhere else.",
 ];
 
 export const ENDPOINTS: EndpointEntry[] = [
@@ -113,6 +114,141 @@ export const ENDPOINTS: EndpointEntry[] = [
           premium_usdt_pct: 0.193,
         },
       ],
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/research/consensus/:ticker",
+    price_usd: "$0.12",
+    description:
+      "Analyst consensus for one KRX ticker, built from the archived research history: mean/median/min/max target price across brokerages, the spread between them, the rating distribution, and a revision log of every target-price and rating change each house has made. Consensus uses each house's latest view, so a weekly publisher does not outvote a quarterly one. Params: ?window=30d|90d|180d|365d (default 90d).",
+    querySchema: {
+      properties: {
+        window: {
+          type: "string",
+          enum: ["30d", "90d", "180d", "365d"],
+          description: "Lookback window (default 90d)",
+        },
+      },
+    },
+    pathParamsSchema: {
+      properties: { ticker: { type: "string", description: "6-digit KRX code, e.g. 005930" } },
+      required: ["ticker"],
+    },
+    queryExample: { window: "90d" },
+    outputExample: {
+      ticker: "011200",
+      company: "HMM",
+      window: "90d",
+      reports_total: 34,
+      brokers: 12,
+      consensus: {
+        mean_target: 30_417,
+        median_target: 30_000,
+        min_target: 26_000,
+        max_target: 35_000,
+        spread_pct: 29.59,
+        ratings: { Buy: 10, Hold: 2 },
+      },
+      changes: [
+        {
+          published_date: "2026-07-31",
+          broker: "LS증권",
+          analyst: "이재혁",
+          target_price: 30_000,
+          prev_target_price: 27_000,
+          target_change_pct: 11.11,
+          target_direction: "raised",
+          rating: "Buy",
+          prev_rating: null,
+          rating_direction: null,
+        },
+      ],
+      series: [
+        {
+          report_idx: 651_350,
+          published_date: "2026-07-31",
+          broker: "LS증권",
+          analyst: "이재혁",
+          target_price: 30_000,
+          rating: "Buy",
+        },
+      ],
+      first_recorded: "2026-08-02",
+      as_of: "2026-08-02T00:00:00.000Z",
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/research/company/:ticker",
+    price_usd: "$0.05",
+    description:
+      "Every archived Korean brokerage report for one KRX ticker, newest first: target price, rating, brokerage, analyst, the Korean title with its English translation, and a one-line English summary. Params: ?limit=20 (max 50).",
+    querySchema: {
+      properties: { limit: { type: "integer", description: "Max reports (default 20, max 50)" } },
+    },
+    pathParamsSchema: {
+      properties: { ticker: { type: "string", description: "6-digit KRX code, e.g. 005930" } },
+      required: ["ticker"],
+    },
+    queryExample: { limit: 10 },
+    outputExample: {
+      ticker: "011200",
+      company: "HMM",
+      count: 3,
+      first_recorded: "2026-08-02",
+      items: [
+        {
+          report_idx: 651_350,
+          published_date: "2026-07-31",
+          ticker: "011200",
+          company: "HMM",
+          title: "2Q26 Preview: 건물 사이에 피어난 장미",
+          title_en: "2Q26 Preview: a rose blooming between the buildings",
+          summary_en:
+            "LS Securities rates HMM (011200) Buy with a KRW 30,000 target in a 2Q26 preview by analyst Lee Jae-hyuk.",
+          target_price: 30_000,
+          rating: "Buy",
+          rating_raw: "Buy",
+          analyst: "이재혁",
+          broker: "LS증권",
+          source_url: "https://consensus.hankyung.com/analysis/downpdf?report_idx=651350",
+        },
+      ],
+      as_of: "2026-08-02T00:00:00.000Z",
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/research/latest",
+    price_usd: "$0.02",
+    description:
+      "Latest Korean brokerage equity research across all covered companies, newest first — company and KRX ticker, target price, rating, brokerage, analyst, and a one-line English summary of each report. Facts and summaries only; the report PDF stays with its publisher and source_url links back to it. Optional ?limit=20 (max 50).",
+    querySchema: {
+      properties: { limit: { type: "integer", description: "Max reports (default 20, max 50)" } },
+    },
+    queryExample: { limit: 10 },
+    outputExample: {
+      count: 20,
+      items: [
+        {
+          report_idx: 651_350,
+          published_date: "2026-07-31",
+          ticker: "011200",
+          company: "HMM",
+          title: "2Q26 Preview: 건물 사이에 피어난 장미",
+          title_en: "2Q26 Preview: a rose blooming between the buildings",
+          summary_en:
+            "LS Securities rates HMM (011200) Buy with a KRW 30,000 target in a 2Q26 preview by analyst Lee Jae-hyuk.",
+          target_price: 30_000,
+          rating: "Buy",
+          rating_raw: "Buy",
+          analyst: "이재혁",
+          broker: "LS증권",
+          source_url: "https://consensus.hankyung.com/analysis/downpdf?report_idx=651350",
+        },
+      ],
+      as_of: "2026-08-02T00:00:00.000Z",
     },
   },
   {

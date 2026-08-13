@@ -157,7 +157,15 @@ export async function handleMcpRequest(
           description: endpoint.description,
           mimeType: "application/json",
           serviceName: SERVICE_NAME,
-          tags: ["korea", "crypto", "kimchi-premium", "market-data", "news"],
+          tags: [
+            "korea",
+            "crypto",
+            "kimchi-premium",
+            "market-data",
+            "news",
+            "equity-research",
+            "analyst-ratings",
+          ],
         },
       });
       const handler = paid(async (toolArgs: Record<string, unknown>) => {

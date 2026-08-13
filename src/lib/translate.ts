@@ -21,7 +21,7 @@ import { cached } from "./cache";
  */
 
 /** Instruct model: correct on proper nouns, unlike the dedicated MT model. */
-const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+export const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 /** Keep concurrent model calls bounded so one request can't stall on a burst. */
 const CONCURRENCY = 4;
 

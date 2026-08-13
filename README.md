@@ -24,11 +24,19 @@ KRW 회수 경로는 실제로 USDT를 거칩니다. 즉 공식 수치는 거래
 
 **3. 영어 번역된 한국 뉴스.** 언어 장벽이 이 니치의 본질인데, 원문만 주면 해외 에이전트에게 무용지물입니다.
 
+**4. 증권사 리서치를 구조화 데이터로.** 한국 증권사 기업 리포트에서 티커·목표주가·투자의견·증권사·애널리스트를
+추출하고 영어 요약을 붙여 팝니다. **PDF는 받지도, 저장하지도, 재배포하지도 않습니다** — 리포트 저작권은 증권사에 있고,
+사실 정보만이 판매 대상입니다. 원문은 `source_url`로 발행처를 가리킵니다. 목록 사이트는 최근 구간만 노출하므로
+증권사별 목표주가·투자의견 변경 이력은 사후 복원이 불가능하며, 김프 아카이브와 같은 구조의 두 번째 해자가 됩니다.
+
 ## 엔드포인트
 
 | Endpoint | 가격 | 내용 |
 |---|---|---|
 | `GET /api/kimchi-premium/stats` | $0.12 | 프리미엄 백분위·평균·표준편차·z점수 (1h~90d). "지금이 이례적인가"에 대한 답 |
+| `GET /api/research/consensus/:ticker` | $0.12 | 종목별 애널리스트 컨센서스 — 목표주가 평균/중앙/최소/최대·분산도, 투자의견 분포, 증권사별 상·하향 이력 |
+| `GET /api/research/company/:ticker` | $0.05 | 종목별 리서치 리포트 목록 (목표주가·투자의견·증권사·영어 요약) |
+| `GET /api/research/latest` | $0.02 | 최신 증권사 기업 리포트 (전 종목, 영어 요약 포함) |
 | `GET /api/kimchi-premium/history` | $0.08 | 프리미엄 시계열 (양 기준) |
 | `GET /api/korea/market-snapshot` | $0.08 | 번들: 김프 + 마켓 + 환율 + 영어 번역 뉴스 |
 | `GET /api/news/headlines/en` | $0.05 | 한국 헤드라인 + 영어 번역 |
@@ -62,12 +70,16 @@ src/
   handlers.ts     runEndpoint() — REST와 MCP가 공유하는 단일 실행 경로
   mcp.ts          MCP JSON-RPC 엔드포인트 (도구별 x402 과금)
   archive.ts      5분 주기 프리미엄 스냅샷 → D1
+  research.ts     1시간 주기 리서치 목록 수집 + 번역·요약 → D1
   lib/
     cache.ts          TTL 캐시 + fetch 헬퍼
     cdp-facilitator.ts  CDP JWT 인증 (Workers 네이티브 WebCrypto)
     translate.ts      한국어→영어 번역 + 수 단위 결정론적 전개
+    summarize.ts      리포트 메타데이터 → 영어 요약 (cron에서만 실행, D1이 캐시)
   sources/
     upbit.ts / global.ts / fx.ts / kimchi.ts / news.ts / history.ts
+    research.ts       리서치 목록 스크레이퍼 (순수 파서 분리)
+    research-db.ts    리서치 아카이브 질의 + 컨센서스 집계
 packages/
   k-data-mcp/     배포용 설치형 MCP 서버 (별도 npm 패키지)
 test/
@@ -104,9 +116,9 @@ npx esbuild test/smoke-sources.ts --bundle --format=esm --platform=node --outfil
 
 메인넷 가동 중: **https://k-data-x402-production.theblack1022.workers.dev**
 
-- 무료 라우트 4개 200, 유료 라우트 9개 모두 402 + Base 메인넷 USDC 결제 요구사항 반환
-- MCP 엔드포인트 `POST /mcp` — 도구 9개, 도구별 과금 확인
-- 아카이브 cron 5분 주기 기록 중 (D1)
+- 무료 라우트 4개 200, 유료 라우트 12개 모두 402 + Base 메인넷 USDC 결제 요구사항 반환
+- MCP 엔드포인트 `POST /mcp` — 도구 12개, 도구별 과금 확인
+- 아카이브 cron 5분 주기, 리서치 수집 cron 1시간 주기 기록 중 (D1)
 - 실거래 정산 1건 온체인 확인 (수취 지갑 USDC 입금)
 
 ## 다음 단계 — 에이전트 유입
@@ -126,3 +138,9 @@ npx esbuild test/smoke-sources.ts --bundle --format=esm --platform=node --outfil
 - **Bazaar discovery 확장의 Ajv 검증은 Workers에서 실패하지만 치명적이지 않습니다.** 미들웨어가 `.catch()`로
   감싸고 있어 시작 시 경고 한 줄만 남고, 선언 자체는 402 응답에 정상적으로 실려 나갑니다.
 - 인메모리 캐시는 Worker 아이솔레이트 단위입니다. 트래픽이 커지면 Cache API나 KV로 옮기는 편이 좋습니다.
+- **`wrangler dev`로는 유료 라우트와 cron을 신뢰성 있게 검증할 수 없습니다.** AI 바인딩이 항상 원격이라
+  dev 세션이 로컬/원격 혼합 모드로 뜨는데, 이 모드에서 유료 라우트가 402 대신 무한 대기하고
+  `scheduled()`의 `ctx.waitUntil` 작업이 아예 실행되지 않습니다(로그·D1 쓰기 모두 없음).
+  실제 런타임에서는 정상입니다 — 검증이 필요하면 `wrangler deploy --name <임시이름>`으로
+  임시 워커를 띄워 확인하고 `wrangler delete`로 지우세요. 데이터 계층은 `node:sqlite`로 D1을 대체해
+  Node에서 직접 검증하는 편이 빠릅니다.

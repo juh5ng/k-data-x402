@@ -16,8 +16,12 @@ import {
   buildOpenApi,
 } from "./catalog";
 import { recordSnapshot, ensureSchema } from "./archive";
+import { runResearchTick } from "./research";
 import { runEndpoint, NotFoundError } from "./handlers";
 import { handleMcpRequest } from "./mcp";
+
+/** Must match the hourly entry in wrangler.jsonc triggers.crons. */
+const RESEARCH_CRON = "7 * * * *";
 
 interface Env {
   NETWORK: string; // "eip155:84532" (Base Sepolia) or "eip155:8453" (Base mainnet)
@@ -151,6 +155,27 @@ app.get(
 );
 
 app.get(
+  "/api/research/latest",
+  paidRoute("/api/research/latest", c => ({ limit: c.req.query("limit") })),
+);
+
+app.get(
+  "/api/research/company/:ticker",
+  paidRoute("/api/research/company/:ticker", c => ({
+    ticker: c.req.param("ticker"),
+    limit: c.req.query("limit"),
+  })),
+);
+
+app.get(
+  "/api/research/consensus/:ticker",
+  paidRoute("/api/research/consensus/:ticker", c => ({
+    ticker: c.req.param("ticker"),
+    window: c.req.query("window"),
+  })),
+);
+
+app.get(
   "/api/crypto/krw/markets",
   paidRoute("/api/crypto/krw/markets", c => ({ limit: c.req.query("limit") })),
 );
@@ -276,11 +301,31 @@ export default {
   fetch: app.fetch,
 
   /**
-   * Cron tick — append one premium snapshot to the archive.
-   * Schema is ensured here rather than in a migration step so a fresh D1 starts
-   * recording on the first tick instead of silently dropping data.
+   * Cron ticks. Schema is ensured inside each job rather than in a migration
+   * step so a fresh D1 starts recording on the first tick instead of silently
+   * dropping data.
+   *
+   * Hourly: ingest new research listings. Every 5 minutes: append one premium
+   * snapshot. Neither may throw past waitUntil — a failed tick should cost one
+   * interval, not the schedule.
    */
-  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    if (event.cron === RESEARCH_CRON) {
+      ctx.waitUntil(
+        (async () => {
+          try {
+            const { inserted, summarized, pending } = await runResearchTick(env.ARCHIVE, env.AI);
+            console.log(
+              `research: inserted ${inserted}, summarized ${summarized}, pending ${pending}`,
+            );
+          } catch (err) {
+            console.error("research: ingest failed:", err);
+          }
+        })(),
+      );
+      return;
+    }
+
     ctx.waitUntil(
       (async () => {
         try {

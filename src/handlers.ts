@@ -3,6 +3,7 @@ import { getKrwTicker, getKrwMarketsSummary } from "./sources/upbit";
 import { getHeadlines } from "./sources/news";
 import { getUsdKrw } from "./sources/fx";
 import { getPremiumHistory, getPremiumStats } from "./sources/history";
+import { getLatestResearch, getCompanyResearch, getConsensus } from "./sources/research-db";
 
 export interface HandlerEnv {
   ARCHIVE: D1Database;
@@ -28,6 +29,12 @@ function int(value: unknown, fallback: number, min: number, max: number): number
 function str(value: unknown): string | undefined {
   return value === undefined || value === null || value === "" ? undefined : String(value);
 }
+
+/** Same miss for both research-by-ticker routes: bad code, or coverage not deep enough yet. */
+const NO_COVERAGE = [
+  "no archived research for this ticker",
+  "Tickers are 6-digit KRX codes, e.g. 005930 for Samsung Electronics. Coverage starts at the archive's first_recorded date, so very recent tickers may have no history yet.",
+] as const;
 
 /**
  * Runs one catalogued endpoint. Both the HTTP routes and the MCP tools go
@@ -66,6 +73,25 @@ export async function runEndpoint(
         );
       }
       return stats;
+    }
+
+    case "/api/research/latest":
+      return getLatestResearch(env.ARCHIVE, int(args.limit, 20, 1, 50));
+
+    case "/api/research/company/:ticker": {
+      const reports = await getCompanyResearch(
+        env.ARCHIVE,
+        str(args.ticker) ?? "",
+        int(args.limit, 20, 1, 50),
+      );
+      if (!reports) throw new NotFoundError(...NO_COVERAGE);
+      return reports;
+    }
+
+    case "/api/research/consensus/:ticker": {
+      const consensus = await getConsensus(env.ARCHIVE, str(args.ticker) ?? "", str(args.window));
+      if (!consensus) throw new NotFoundError(...NO_COVERAGE);
+      return consensus;
     }
 
     case "/api/crypto/krw/markets":

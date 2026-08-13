@@ -44,7 +44,9 @@
       "observability": { "enabled": true },
       // Snapshot the premium every 5 minutes. The archive is the moat: no
       // competitor sells history, and every skipped interval is gone for good.
-      "triggers": { "crons": ["*/5 * * * *"] }
+      // The hourly tick ingests new research listings; minute 7 keeps it from
+      // ever landing on the same instant as the 5-minute snapshot.
+      "triggers": { "crons": ["*/5 * * * *", "7 * * * *"] }
     }
   }
 }
