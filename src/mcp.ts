@@ -3,8 +3,15 @@ import type { FacilitatorClient } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { createPaymentWrapper } from "@x402/mcp";
 
-import { ENDPOINTS, SERVICE_NAME, SERVICE_TAGLINE, type EndpointEntry } from "./catalog";
+import {
+  ENDPOINTS,
+  SERVICE_NAME,
+  SERVICE_TAGLINE,
+  priceToNumber,
+  type EndpointEntry,
+} from "./catalog";
 import { runEndpoint, NotFoundError, type HandlerEnv } from "./handlers";
+import { recordReceipt } from "./receipts";
 
 /**
  * Stateless MCP endpoint, spoken directly over JSON-RPC.
@@ -166,6 +173,24 @@ export async function handleMcpRequest(
             "equity-research",
             "analyst-ratings",
           ],
+        },
+        // The MCP context names the tool outright, so unlike the HTTP hook in
+        // index.ts there is no path to map back to a catalogue entry.
+        hooks: {
+          onAfterSettlement: async settleCtx => {
+            await recordReceipt(env.ARCHIVE, {
+              endpoint: endpoint.path,
+              transport: "mcp",
+              tool_name: settleCtx.toolName ?? name,
+              price_usd: priceToNumber(endpoint.price_usd),
+              amount_atomic: settleCtx.paymentRequirements?.amount ?? null,
+              payer: settleCtx.settlement?.payer ?? null,
+              tx_hash: settleCtx.settlement?.transaction ?? null,
+              network: settleCtx.settlement?.network ?? network,
+              success: settleCtx.settlement?.success === true,
+              error_reason: settleCtx.settlement?.errorReason ?? null,
+            });
+          },
         },
       });
       const handler = paid(async (toolArgs: Record<string, unknown>) => {

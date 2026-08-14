@@ -53,3 +53,28 @@ CREATE INDEX IF NOT EXISTS idx_research_ticker_date ON research_reports (ticker,
 CREATE INDEX IF NOT EXISTS idx_research_date ON research_reports (published_date);
 -- Partial: the ingest tick only ever asks for the unprocessed backlog.
 CREATE INDEX IF NOT EXISTS idx_research_unprocessed ON research_reports (processed) WHERE processed = 0;
+
+-- Sales ledger. Written by the x402 settlement hooks in src/index.ts (HTTP) and
+-- src/mcp.ts (MCP); mirrors ensureReceiptsSchema() in src/receipts.ts, which is
+-- what actually runs.
+--
+-- Needed because the on-chain transfer cannot say what was sold: catalogue
+-- prices collide across endpoints ($0.005, $0.01, $0.05, $0.08 and $0.12 each
+-- cover two routes), so an amount narrows a sale to a pair at best.
+CREATE TABLE IF NOT EXISTS receipts (
+  ts INTEGER NOT NULL,              -- unix seconds
+  endpoint TEXT NOT NULL,           -- catalogue path, e.g. /api/research/consensus/:ticker
+  transport TEXT NOT NULL,          -- 'http' | 'mcp'
+  tool_name TEXT,                   -- MCP tool name, null over HTTP
+  price_usd REAL,                   -- catalogue list price
+  amount_atomic TEXT,               -- what the requirements charged (USDC, 6 decimals)
+  payer TEXT,                       -- buyer wallet; repeat purchases are the metric that matters
+  tx_hash TEXT,                     -- basescan.org/tx/<hash>
+  network TEXT,
+  success INTEGER NOT NULL,         -- failed settlements are recorded too: a run of them
+  error_reason TEXT                 -- looks like "no customers" unless it is written down
+);
+
+CREATE INDEX IF NOT EXISTS idx_receipts_ts ON receipts (ts);
+CREATE INDEX IF NOT EXISTS idx_receipts_endpoint ON receipts (endpoint, ts);
+CREATE INDEX IF NOT EXISTS idx_receipts_payer ON receipts (payer);

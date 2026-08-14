@@ -4,3 +4,6 @@ dist/
 .dev.vars
 .env
 *.log
+# Generated dashboard — contains revenue and wallet figures, never committed.
+.dashboard/
+.claude/

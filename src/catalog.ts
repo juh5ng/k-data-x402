@@ -364,6 +364,29 @@ export const ENDPOINTS: EndpointEntry[] = [
   },
 ];
 
+/** "$0.12" -> 0.12. Prices are stored as display strings; the ledger needs numbers. */
+export function priceToNumber(price: string): number {
+  const n = parseFloat(price.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Resolves a concrete request path to its catalogue entry, treating `:param`
+ * segments as wildcards: "/api/crypto/krw/BTC" -> the "/api/crypto/krw/:ticker"
+ * entry. Used by the paywall to decide what is billable, and by the sales
+ * ledger to record which product was bought rather than which URL was hit.
+ */
+export function matchCatalogPath(path: string): EndpointEntry | null {
+  const actual = path.split("/");
+  return (
+    ENDPOINTS.find(e => {
+      const pattern = e.path.split("/");
+      if (pattern.length !== actual.length) return false;
+      return pattern.every((seg, i) => seg.startsWith(":") || seg === actual[i]);
+    }) ?? null
+  );
+}
+
 /** Machine-readable catalog served free at /api/catalog. */
 export function buildCatalog(serviceUrl: string, network: string) {
   return {

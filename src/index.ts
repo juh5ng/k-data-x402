@@ -14,9 +14,12 @@ import {
   SERVICE_EDGE,
   buildCatalog,
   buildOpenApi,
+  matchCatalogPath,
+  priceToNumber,
 } from "./catalog";
 import { recordSnapshot, ensureSchema } from "./archive";
 import { runResearchTick } from "./research";
+import { recordReceipt, ensureReceiptsSchema } from "./receipts";
 import { runEndpoint, NotFoundError } from "./handlers";
 import { handleMcpRequest } from "./mcp";
 
@@ -47,11 +50,61 @@ function buildFacilitator(env: Env) {
     : new HTTPFacilitatorClient({ url: env.FACILITATOR_URL || "https://x402.org/facilitator" });
 }
 
+/**
+ * Digs the request path out of a settlement hook's transport context, which is
+ * typed `unknown` because the resource server is transport-agnostic. On the
+ * HTTP transport it is an HTTPTransportContext carrying `request.path`.
+ */
+function requestPathOf(transportContext: unknown): string | null {
+  const req = (transportContext as { request?: { path?: unknown } } | undefined)?.request;
+  return typeof req?.path === "string" ? req.path : null;
+}
+
+function settleErrorText(ctx: { error?: unknown }): string {
+  return ctx.error instanceof Error ? ctx.error.message : String(ctx.error ?? "settlement failed");
+}
+
 function buildPaywall(env: Env): MiddlewareHandler {
   const facilitator = buildFacilitator(env);
 
   const network = env.NETWORK as `${string}:${string}`;
-  const resourceServer = new x402ResourceServer(facilitator).register(network, new ExactEvmScheme());
+
+  // Settlement hooks, not a middleware wrapper: the library swallows throws
+  // from these, so a D1 outage can cost a ledger row but never the response
+  // the buyer just paid for. The HTTP transport reports the concrete request
+  // path, so it is mapped back to a catalogue entry before recording.
+  const resourceServer = new x402ResourceServer(facilitator)
+    .register(network, new ExactEvmScheme())
+    .onAfterSettle(async ctx => {
+      const path = requestPathOf(ctx.transportContext);
+      const entry = path ? matchCatalogPath(path) : null;
+      await recordReceipt(env.ARCHIVE, {
+        endpoint: entry?.path ?? path ?? "unknown",
+        transport: "http",
+        price_usd: entry ? priceToNumber(entry.price_usd) : null,
+        amount_atomic: ctx.requirements?.amount ?? null,
+        payer: ctx.result?.payer ?? null,
+        tx_hash: ctx.result?.transaction ?? null,
+        network: ctx.result?.network ?? network,
+        success: ctx.result?.success === true,
+        error_reason: ctx.result?.errorReason ?? null,
+      });
+    })
+    .onSettleFailure(async ctx => {
+      const path = requestPathOf(ctx.transportContext);
+      const entry = path ? matchCatalogPath(path) : null;
+      await recordReceipt(env.ARCHIVE, {
+        endpoint: entry?.path ?? path ?? "unknown",
+        transport: "http",
+        price_usd: entry ? priceToNumber(entry.price_usd) : null,
+        amount_atomic: ctx.requirements?.amount ?? null,
+        payer: null,
+        tx_hash: null,
+        network,
+        success: false,
+        error_reason: settleErrorText(ctx),
+      });
+    });
 
   const routes: RoutesConfig = {};
   for (const e of ENDPOINTS) {
@@ -85,13 +138,7 @@ function buildPaywall(env: Env): MiddlewareHandler {
 
 /** True if the request targets one of the paid endpoints (supports :param segments). */
 function isPaidPath(method: string, path: string): boolean {
-  if (method !== "GET") return false;
-  return ENDPOINTS.some(e => {
-    const pattern = e.path.split("/");
-    const actual = path.split("/");
-    if (pattern.length !== actual.length) return false;
-    return pattern.every((seg, i) => seg.startsWith(":") || seg === actual[i]);
-  });
+  return method === "GET" && matchCatalogPath(path) !== null;
 }
 
 let paywall: MiddlewareHandler | null = null;
@@ -330,6 +377,9 @@ export default {
       (async () => {
         try {
           await ensureSchema(env.ARCHIVE);
+          // Created here as well as lazily on the payment path, so the ledger
+          // exists — and reads as an honest zero — before the first sale.
+          await ensureReceiptsSchema(env.ARCHIVE);
           const rows = await recordSnapshot(env.ARCHIVE);
           console.log(`archive: recorded ${rows} rows`);
         } catch (err) {
