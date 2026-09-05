@@ -16,6 +16,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { retrySync } from "./retry-sync.mjs";
 
 const SERVICE = "https://k-data-x402-production.theblack1022.workers.dev";
 const PAY_TO = "0x519c79c7EB7566F7353a324472A5CE4f05330C81";
@@ -41,17 +42,25 @@ const WRANGLER = fileURLToPath(new URL("../node_modules/wrangler/bin/wrangler.js
  * several statements comes back as a summary ("Total queries executed: 2")
  * with no per-statement rows at all.
  */
-function queryD1(sql) {
+function queryD1Once(sql) {
   const res = spawnSync(
     process.execPath,
     [WRANGLER, "d1", "execute", DB, "--env", "production", "--remote", "--json", "--command", sql],
     { encoding: "utf8", maxBuffer: 1 << 27 },
   );
   const out = `${res.stdout ?? ""}`;
-  // wrangler prints config warnings before the JSON payload.
-  const start = out.indexOf("[");
-  if (start === -1) throw new Error((res.stderr || out || "no output").trim().slice(0, 400));
-  return JSON.parse(out.slice(start))[0]?.results ?? [];
+  // wrangler prints config warnings before the JSON payload, and those warnings
+  // can themselves contain a literal "[" (e.g. an ANSI-colored "[WARNING]" tag),
+  // so a plain indexOf("[") can latch onto that instead of the real payload.
+  // The payload is wrangler's pretty-printed JSON, whose outer "[" always sits
+  // alone on its own line — match that instead of the first "[" anywhere.
+  const match = /^\[\r?\n/m.exec(out);
+  if (!match) throw new Error((res.stderr || out || "no output").trim().slice(0, 400));
+  return JSON.parse(out.slice(match.index))[0]?.results ?? [];
+}
+
+function queryD1(sql) {
+  return retrySync(() => queryD1Once(sql), 2);
 }
 
 function collectRevenue() {

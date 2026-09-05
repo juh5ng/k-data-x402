@@ -17,15 +17,26 @@ export interface EndpointEntry {
 
 export const SERVICE_NAME = "K-Data x402";
 export const SERVICE_TAGLINE =
-  "Korean market data for AI agents — kimchi premium on a tradeable USDT basis, premium history and percentiles, Korean news translated to English, Upbit KRW quotes. Pay per request with USDC via x402. No account, no API key.";
+  "Korean equity research and market data for AI agents — analyst target prices, ratings and per-brokerage revision history by KRX ticker with English summaries, kimchi premium on a tradeable USDT basis with percentile context, and Korean news translated to English. Pay per request with USDC via x402. No account, no API key.";
 
-/** Why an agent should pick this over calling Upbit directly. Surfaced to agents verbatim. */
+/** Why an agent should pick this over calling the sources directly. Surfaced to agents verbatim. */
 export const SERVICE_EDGE = [
+  "Korean sell-side research as structured data: target price, rating, brokerage and analyst per KRX ticker with an English summary, plus the consensus built from them and a per-house revision log of who raised and who cut. The listing site publishes a rolling recent window only, so this series cannot be reconstructed after the fact — it is archived here and nowhere else. Facts and original summaries only; the report PDF stays with its publisher and source_url links back to it.",
   "Dual-basis kimchi premium: the official USD/KRW figure everyone quotes, plus the Upbit KRW/USDT basis that an arbitrageur can actually realize. The two often disagree in sign — official can read negative while the tradeable basis is positive.",
   "Premium history and percentile context, continuously archived. No free source and no competing x402 seller offers this; it cannot be reconstructed after the fact.",
   "Korean headlines translated to English, so a non-Korean agent can actually use them.",
-  "Korean sell-side research as structured data: target prices, ratings and revision history per KRX ticker, summarised in English. The listing site shows a rolling recent window only, so the analyst consensus series is archived here and nowhere else.",
 ];
+
+/** No-cost, date-stamped previews let agents judge fit before wiring a wallet. */
+export const FREE_ENDPOINTS = [
+  "/",
+  "/api/catalog",
+  "/openapi.json",
+  "/llms.txt",
+  "/api/preview/kimchi-premium",
+  "/api/preview/research/coverage",
+  "/api/preview/research/:ticker",
+] as const;
 
 export const ENDPOINTS: EndpointEntry[] = [
   {
@@ -91,12 +102,13 @@ export const ENDPOINTS: EndpointEntry[] = [
     path: "/api/kimchi-premium/history",
     price_usd: "$0.08",
     description:
-      "Time series of the kimchi premium from the continuous archive, both bases, newest-last. Params: ?symbol=BTC &window=1h|6h|24h|7d|30d|90d &points=500 (max 2000). Archive depth is reported as first_recorded.",
+      "Time series of the kimchi premium from the continuous archive, both bases, newest-last. Params: ?symbol=BTC &window=1h|6h|24h|7d|30d|90d &points=500 (max 2000) &before=<next_before>. Repeat with next_before until it is null to read a full window. Archive depth is reported as first_recorded.",
     querySchema: {
       properties: {
         symbol: { type: "string", description: "Archived tickers: BTC, ETH, XRP, SOL, DOGE, USDT" },
         window: { type: "string", enum: ["1h", "6h", "24h", "7d", "30d", "90d"], description: "Lookback window (default 24h)" },
         points: { type: "integer", description: "Max points returned (default 500, max 2000)" },
+        before: { type: "integer", description: "Unix-second cursor from next_before; returns older rows strictly before it" },
       },
     },
     queryExample: { symbol: "BTC", window: "24h" },
@@ -105,6 +117,7 @@ export const ENDPOINTS: EndpointEntry[] = [
       window: "24h",
       points: 288,
       first_recorded: "2026-08-01T14:20:00.000Z",
+      next_before: "1754058000",
       series: [
         {
           ts: "2026-08-01T14:25:00.000Z",
@@ -402,7 +415,7 @@ export function buildCatalog(serviceUrl: string, network: string) {
       how: "Request any paid endpoint without payment to receive HTTP 402 with payment requirements, pay with any x402 client (e.g. @x402/fetch), then retry with the payment header.",
     },
     base_url: serviceUrl,
-    free_endpoints: ["/", "/api/catalog", "/openapi.json", "/llms.txt"],
+    free_endpoints: FREE_ENDPOINTS,
     paid_endpoints: ENDPOINTS.map(e => ({
       method: e.method,
       path: e.path,

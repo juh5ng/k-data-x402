@@ -27,7 +27,8 @@
         // Base mainnet. PAY_TO must be set to your real wallet before deploy.
         "NETWORK": "eip155:8453",
         "PAY_TO": "0x519c79c7EB7566F7353a324472A5CE4f05330C81",
-        "SERVICE_URL": "https://k-data-x402-production.theblack1022.workers.dev"
+        "SERVICE_URL": "https://k-data-x402-production.theblack1022.workers.dev",
+        "FACILITATOR_URL": "https://x402.org/facilitator"
         // CDP facilitator is used automatically when secrets are present:
         //   wrangler secret put CDP_API_KEY_ID --env production
         //   wrangler secret put CDP_API_KEY_SECRET --env production

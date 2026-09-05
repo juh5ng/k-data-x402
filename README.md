@@ -46,7 +46,9 @@ KRW 회수 경로는 실제로 USDT를 거칩니다. 즉 공식 수치는 거래
 | `GET /api/crypto/krw/:ticker` | $0.005 | 개별 코인 KRW 시세 |
 | `GET /api/fx/usdkrw` | $0.005 | 원달러 환율 |
 
-무료: `/` (랜딩) · `/api/catalog` · `/openapi.json` · `/llms.txt` · `POST /mcp` (도구 목록)
+무료 체험: `/api/preview/research/coverage` (종목별 리포트·증권사 수와 날짜 범위) · `/api/preview/research/:ticker` (한 종목의 실제 아카이브 깊이) · `/api/preview/kimchi-premium` (BTC 한 종목 실시간 샘플). 체험은 리포트 본문·요약·컨센서스를 제공하지 않습니다.
+
+기타 무료: `/` (랜딩) · `/api/catalog` · `/openapi.json` · `/llms.txt` · `POST /mcp` (도구 목록)
 
 가격은 시장 평균 거래액($0.37)을 감안해 책정했습니다. 저가 엔드포인트는 유입용이고,
 대체 불가능한 아카이브 기반 엔드포인트가 객단가를 담당합니다.
@@ -58,8 +60,9 @@ KRW 회수 경로는 실제로 USDT를 거칩니다. 즉 공식 수치는 거래
 - **REST** — 임의의 x402 클라이언트 (`@x402/fetch` 등)
 - **MCP** — `POST /mcp` 호스팅형, 또는 설치형 [`k-data-mcp`](packages/k-data-mcp) npm 패키지
 
-MCP 패키지는 시작 시 `/api/catalog`을 읽어 도구를 생성하므로, 서버에 엔드포인트를 추가하면
-패키지 재배포 없이 도구가 늘어납니다.
+MCP 패키지는 지갑 없이도 카탈로그와 무료 체험 도구를 실행합니다. 결제 지갑과 세션 예산을 설정하면 시작 시 `/api/catalog`을 읽어 유료 도구도 생성합니다.
+
+김프 히스토리는 `next_before`를 반환합니다. `?before=<next_before>`로 반복 호출하면 2,000포인트 제한을 넘어 요청 기간 전체를 페이지로 받을 수 있습니다.
 
 ## 구조
 
@@ -67,8 +70,9 @@ MCP 패키지는 시작 시 `/api/catalog`을 읽어 도구를 생성하므로, 
 src/
   index.ts        라우팅 + x402 페이월 + cron(scheduled) 진입점
   catalog.ts      엔드포인트·가격·스키마의 단일 원천 (페이월/카탈로그/OpenAPI/랜딩/llms.txt/MCP가 모두 참조)
-  handlers.ts     runEndpoint() — REST와 MCP가 공유하는 단일 실행 경로
-  mcp.ts          MCP JSON-RPC 엔드포인트 (도구별 x402 과금)
+  handlers.ts     유료·무료 체험 REST와 MCP가 공유하는 실행 경로
+  mcp.ts          MCP JSON-RPC 엔드포인트 (무료 체험 + 유료 도구별 x402 과금)
+  free-preview.ts 체험 응답의 커버리지 안내 문구
   archive.ts      5분 주기 프리미엄 스냅샷 → D1
   research.ts     1시간 주기 리서치 목록 수집 + 번역·요약 → D1
   lib/
@@ -116,8 +120,8 @@ npx esbuild test/smoke-sources.ts --bundle --format=esm --platform=node --outfil
 
 메인넷 가동 중: **https://k-data-x402-production.theblack1022.workers.dev**
 
-- 무료 라우트 4개 200, 유료 라우트 12개 모두 402 + Base 메인넷 USDC 결제 요구사항 반환
-- MCP 엔드포인트 `POST /mcp` — 도구 12개, 도구별 과금 확인
+- 무료 체험 3개와 카탈로그·문서 라우트, 유료 라우트 12개 모두 별도 검증 가능
+- MCP 엔드포인트 `POST /mcp` — 무료 체험 3개 + 유료 도구 12개
 - 아카이브 cron 5분 주기, 리서치 수집 cron 1시간 주기 기록 중 (D1)
 - 실거래 정산 1건 온체인 확인 (수취 지갑 USDC 입금)
 

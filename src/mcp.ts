@@ -10,8 +10,11 @@ import {
   priceToNumber,
   type EndpointEntry,
 } from "./catalog";
-import { runEndpoint, NotFoundError, type HandlerEnv } from "./handlers";
+import { runEndpoint, runPreviewEndpoint, NotFoundError, type HandlerEnv } from "./handlers";
 import { recordReceipt } from "./receipts";
+import { FREE_PREVIEW_TOOLS } from "./preview-tools";
+
+export { FREE_PREVIEW_TOOLS } from "./preview-tools";
 
 /**
  * Stateless MCP endpoint, spoken directly over JSON-RPC.
@@ -132,10 +135,29 @@ export async function handleMcpRequest(
       return rpcResult(id, {});
 
     case "tools/list":
-      return rpcResult(id, { tools: ENDPOINTS.map(toolDescriptor) });
+      return rpcResult(id, {
+        tools: [
+          ...FREE_PREVIEW_TOOLS.map(({ path: _path, ...tool }) => tool),
+          ...ENDPOINTS.map(toolDescriptor),
+        ],
+      });
 
     case "tools/call": {
       const name = String(params?.name ?? "");
+      const freeTool = FREE_PREVIEW_TOOLS.find(tool => tool.name === name);
+      if (freeTool) {
+        try {
+          const data = await runPreviewEndpoint(
+            freeTool.path,
+            (params?.arguments ?? {}) as Record<string, unknown>,
+            env,
+          );
+          return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(data) }] });
+        } catch (err) {
+          if (err instanceof NotFoundError) return rpcError(id, -32602, err.message, err.hint);
+          return rpcError(id, -32603, `Preview execution failed: ${(err as Error)?.message ?? String(err)}`);
+        }
+      }
       const endpoint = ENDPOINTS.find(e => toolNameFor(e.path) === name);
       if (!endpoint) return rpcError(id, -32602, `Unknown tool: ${name}`);
 
@@ -166,12 +188,15 @@ export async function handleMcpRequest(
           serviceName: SERVICE_NAME,
           tags: [
             "korea",
-            "crypto",
-            "kimchi-premium",
-            "market-data",
-            "news",
+            "krx",
             "equity-research",
             "analyst-ratings",
+            "target-price",
+            "consensus",
+            "market-data",
+            "crypto",
+            "kimchi-premium",
+            "news",
           ],
         },
         // The MCP context names the tool outright, so unlike the HTTP hook in

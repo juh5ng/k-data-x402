@@ -2,9 +2,9 @@
 
 에이전트 유입 경로별 제출 내용입니다. **계정 로그인이 필요한 곳은 직접 제출하셔야 합니다** — 아래는 그대로 붙여넣을 수 있게 준비한 원고입니다.
 
-제출 전에 해야 할 것 (모두 완료):
+제출 전에 해야 할 것:
 1. GitHub 공개 레포 [juh5ng/k-data-mcp](https://github.com/juh5ng/k-data-mcp) — 배포되는 패키지의 소스는 **그 레포**이지 이 저장소의 `packages/k-data-mcp/`가 아닙니다. 이쪽은 읽기 전용 미러라 `private: true`로 막아두었습니다.
-2. `npm publish` — 그 레포를 clone해 `npm install && npm run build` 후 배포. 빌드를 건너뛰면 `dist/`가 빠진 채 올라가 `npx k-data-mcp`가 즉시 깨집니다. (현재 npm: 0.2.0)
+2. `npm publish` — 그 레포를 clone해 `npm install && npm run build` 후 `0.3.0`을 배포. 빌드를 건너뛰면 `dist/`가 빠진 채 올라가 `npx k-data-mcp`가 즉시 깨집니다.
 3. [server.json](packages/k-data-mcp/server.json)의 `REPLACE_WITH_YOUR_GITHUB_USERNAME` 두 곳 교체 (완료: juh5ng)
 
 ---
@@ -41,7 +41,7 @@ checkout rather than passing a path:
 .\mcp-publisher.exe publish
 ```
 
-네임스페이스(`io.github.juh5ng/k-data-mcp`)는 GitHub 계정 소유 증명으로 확보됩니다.
+새 이름은 `io.github.juh5ng/korea-stock-research-mcp`입니다. Registry 검색은 이름을 우선 매칭하므로 `korea`, `stock`, `research`를 모두 포함합니다. 기존 `io.github.juh5ng/k-data-mcp` 항목은 유지하되 새 버전의 대상이 아닙니다.
 
 ---
 
@@ -51,7 +51,7 @@ https://github.com/chatmcp/mcp-directory/issues 에 새 이슈:
 
 **제목**
 ```
-Submit: k-data — Korean market data (kimchi premium, news translation) with x402 pay-per-call
+Submit: K-Data — Korean sell-side research and market data with x402 pay-per-call
 ```
 
 **본문**
@@ -61,10 +61,14 @@ npm: https://www.npmjs.com/package/k-data-mcp
 Repo: https://github.com/juh5ng/k-data-mcp
 Transport: stdio
 
-Korean market data for AI agents, metered per call in USDC over the x402 protocol —
-no account, no API key, no signup.
+Korean sell-side research and market data for AI agents, metered per call in USDC
+over the x402 protocol. Start with wallet-free, date-stamped previews; add a
+dedicated wallet only for paid calls.
 
 What makes it different:
+- Korean analyst target prices, ratings and per-brokerage revision history by KRX
+  ticker. Coverage previews disclose the actual report and brokerage counts before
+  an agent pays for a company report or consensus.
 - Kimchi premium on a *tradeable* basis. The widely quoted figure uses the official
   USD/KRW rate, but Korean capital controls push the KRW exit leg through USDT, so
   that number isn't actionable. This returns both bases, and they routinely disagree
@@ -76,8 +80,9 @@ What makes it different:
   deterministically before translation, so "989억달러" returns as $98.9 billion
   rather than the 10x-off answer language models give unaided.
 
-Free `list_endpoints` tool shows all prices before spending anything.
-Spending is capped by K_DATA_MAX_SPEND_USD.
+Free `list_endpoints`, `preview_research_coverage`, `preview_research`, and
+`preview_kimchi_premium` tools show fit before spending anything. Spending is
+capped by K_DATA_MAX_SPEND_USD.
 ```
 
 ---
@@ -99,7 +104,7 @@ https://smithery.ai 에서 GitHub 로그인 → **Add Server** → 레포 URL �
 
 **한 줄 설명**
 ```
-Korean market data for agents — tradeable-basis kimchi premium, premium history and percentiles, Korean news translated to English. Pay-per-call in USDC via x402, no API key.
+Korean sell-side research and market data for agents — analyst target prices, ratings and revision history by KRX ticker, plus tradeable-basis kimchi premium and Korean news in English. Free date-stamped previews; pay-per-call in USDC via x402.
 ```
 
 ---
@@ -111,7 +116,7 @@ https://www.pulsemcp.com/submit 폼:
 | 항목 | 값 |
 |---|---|
 | Name | k-data |
-| Description | Korean market data for agents: tradeable-basis kimchi premium, premium history and percentiles, Korean news translated to English. Metered per call in USDC via x402 — no account or API key. |
+| Description | Korean sell-side research and market data: analyst target prices, ratings and revision history by KRX ticker, plus tradeable-basis kimchi premium and Korean news in English. Free date-stamped previews; metered per call in USDC via x402. |
 | Repository | `https://github.com/juh5ng/k-data-mcp` |
 | npm | `k-data-mcp` |
 | Transport | stdio |
@@ -125,12 +130,12 @@ https://github.com/xpaysh/awesome-x402 를 fork → README의 서비스 목록�
 
 **추가할 줄**
 ```markdown
-- [K-Data](https://k-data-x402-production.theblack1022.workers.dev) — Korean market data: kimchi premium on a tradeable USDT basis (not just the untradeable official-FX figure), premium history and percentile context from a continuous archive, and Korean news translated to English. 9 endpoints, $0.005–$0.12. [MCP server](https://www.npmjs.com/package/k-data-mcp) included.
+- [K-Data](https://k-data-x402-production.theblack1022.workers.dev) — Korean sell-side research with analyst target prices, ratings and revision history by KRX ticker, plus tradeable-basis kimchi premium, continuous history and English Korean news. 12 paid endpoints, $0.005–$0.12, with wallet-free previews. [MCP server](https://www.npmjs.com/package/k-data-mcp) included.
 ```
 
 **PR 제목**
 ```
-Add K-Data — Korean market data API (kimchi premium, news translation)
+Add K-Data — Korean sell-side research and market data API
 ```
 
 **PR 본문**
@@ -146,8 +151,8 @@ official USD/KRW basis (the quoted figure) and the Upbit KRW/USDT basis (the mar
 actually realizable given Korean capital controls). The two frequently disagree in
 sign, so agents acting on the official number alone reach the opposite conclusion.
 
-An MCP server (`k-data-mcp`) is published alongside it, with a free `list_endpoints`
-tool and a hard spend cap.
+An MCP server (`k-data-mcp`) is published alongside it, with wallet-free coverage
+and live-data previews plus a hard spend cap for paid tools.
 ```
 
 ---
@@ -157,7 +162,7 @@ tool and a hard spend cap.
 https://github.com/punkpeye/awesome-mcp-servers — Finance 섹션에 추가:
 
 ```markdown
-- [k-data-mcp](https://github.com/juh5ng/k-data-mcp) 🏎️ ☁️ - Korean market data: tradeable-basis kimchi premium, premium history and percentiles, Korean news translated to English. Pay-per-call in USDC via x402, no API key.
+- [k-data-mcp](https://github.com/juh5ng/k-data-mcp) 🏎️ ☁️ - Korean sell-side research by KRX ticker, tradeable-basis kimchi premium, premium history and English Korean news. Wallet-free previews; pay-per-call in USDC via x402.
 ```
 
 ---

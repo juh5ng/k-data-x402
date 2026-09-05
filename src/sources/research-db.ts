@@ -30,6 +30,8 @@ function normalizeTicker(raw: string): string {
 const REPORT_COLUMNS = `report_idx, published_date, ticker, company, title, title_en,
        summary_en, target_price, rating, rating_raw, analyst, broker, source_url`;
 
+import { buildResearchPreview, type ResearchPreviewInput } from "../free-preview";
+
 export interface ResearchItem {
   report_idx: number;
   published_date: string;
@@ -44,6 +46,45 @@ export interface ResearchItem {
   analyst: string | null;
   broker: string | null;
   source_url: string;
+}
+
+interface CoverageRow extends ResearchPreviewInput {}
+
+/**
+ * Free coverage check used before a buyer spends on a company report or
+ * consensus. It reveals archive depth, not any paid report content.
+ */
+export async function getResearchPreview(db: D1Database, ticker: string) {
+  const code = normalizeTicker(ticker);
+  if (code.length !== 6) return null;
+  const row = await db
+    .prepare(
+      `SELECT ticker, max(company) AS company, count(*) AS reports,
+              count(DISTINCT broker) AS brokers, min(published_date) AS first_recorded,
+              max(published_date) AS latest_published
+         FROM research_reports WHERE ticker = ? GROUP BY ticker`,
+    )
+    .bind(code)
+    .first<CoverageRow>();
+  return row ? buildResearchPreview(row) : null;
+}
+
+/** Most-covered symbols, so buyers can choose an honest multi-house sample. */
+export async function getResearchCoverage(db: D1Database, limit = 25) {
+  const { results } = await db
+    .prepare(
+      `SELECT ticker, max(company) AS company, count(*) AS reports,
+              count(DISTINCT broker) AS brokers, min(published_date) AS first_recorded,
+              max(published_date) AS latest_published
+         FROM research_reports
+        WHERE ticker IS NOT NULL
+        GROUP BY ticker
+        ORDER BY brokers DESC, reports DESC, latest_published DESC
+        LIMIT ?`,
+    )
+    .bind(Math.min(Math.max(limit, 1), 50))
+    .all<CoverageRow>();
+  return { items: results.map(buildResearchPreview), as_of: new Date().toISOString() };
 }
 
 /** Newest research across all covered companies. */

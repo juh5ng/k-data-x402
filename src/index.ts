@@ -9,6 +9,7 @@ import { createCdpFacilitatorClient } from "./lib/cdp-facilitator";
 
 import {
   ENDPOINTS,
+  FREE_ENDPOINTS,
   SERVICE_NAME,
   SERVICE_TAGLINE,
   SERVICE_EDGE,
@@ -20,7 +21,7 @@ import {
 import { recordSnapshot, ensureSchema } from "./archive";
 import { runResearchTick } from "./research";
 import { recordReceipt, ensureReceiptsSchema } from "./receipts";
-import { runEndpoint, NotFoundError } from "./handlers";
+import { runEndpoint, runPreviewEndpoint, NotFoundError } from "./handlers";
 import { handleMcpRequest } from "./mcp";
 
 /** Must match the hourly entry in wrangler.jsonc triggers.crons. */
@@ -189,6 +190,7 @@ app.get(
     symbol: c.req.query("symbol"),
     window: c.req.query("window"),
     points: c.req.query("points"),
+    before: c.req.query("before"),
   })),
 );
 
@@ -252,6 +254,31 @@ app.get("/api/fx/usdkrw", paidRoute("/api/fx/usdkrw", () => ({})));
 
 app.get("/api/korea/market-snapshot", paidRoute("/api/korea/market-snapshot", () => ({})));
 
+function previewRoute(path: string, pick: (c: AppContext) => Record<string, unknown>) {
+  return async (c: AppContext) => {
+    try {
+      return c.json(await runPreviewEndpoint(path, pick(c), c.env));
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return c.json({ error: err.message, ...(err.hint ? { hint: err.hint } : {}) }, 404);
+      }
+      throw err;
+    }
+  };
+}
+
+// Wallet-free previews show real dates and archive depth before an agent chooses
+// a paid research or premium endpoint.
+app.get("/api/preview/kimchi-premium", previewRoute("/api/preview/kimchi-premium", () => ({})));
+app.get(
+  "/api/preview/research/coverage",
+  previewRoute("/api/preview/research/coverage", c => ({ limit: c.req.query("limit") })),
+);
+app.get(
+  "/api/preview/research/:ticker",
+  previewRoute("/api/preview/research/:ticker", c => ({ ticker: c.req.param("ticker") })),
+);
+
 // ---------------------------------------------------------------------------
 // Free discovery routes
 // ---------------------------------------------------------------------------
@@ -290,6 +317,9 @@ app.get("/llms.txt", c => {
     ``,
     `## Free endpoints`,
     ``,
+    `- [GET /api/preview/research/coverage](${base}/api/preview/research/coverage): date-stamped per-ticker report and brokerage coverage, no report content`,
+    `- [GET /api/preview/research/:ticker](${base}/api/preview/research/005930): one ticker's actual archive depth and latest date, no paid report content`,
+    `- [GET /api/preview/kimchi-premium](${base}/api/preview/kimchi-premium): live BTC-only sample; paid endpoint supports up to 10 symbols`,
     `- [GET /openapi.json](${base}/openapi.json): OpenAPI 3.1 spec with per-endpoint pricing`,
     `- [GET /api/catalog](${base}/api/catalog): machine-readable catalog with schemas and examples`,
   ];
@@ -334,6 +364,7 @@ ${SERVICE_EDGE.map(s => `<li>${s}</li>`).join("\n")}
 <li>Pay with any x402 client (<code>@x402/fetch</code>, x402 MCP tools, Apify, etc.).</li>
 <li>Retry with the payment header → data is returned and payment settles on-chain.</li>
 </ol>
+<p>Try free, date-stamped previews: <a href="${base}/api/preview/research/coverage"><code>research coverage</code></a> · <a href="${base}/api/preview/research/005930"><code>ticker coverage</code></a> · <a href="${base}/api/preview/kimchi-premium"><code>BTC premium sample</code></a></p>
 <p>For agents: <a href="${base}/openapi.json"><code>openapi.json</code></a> · <a href="${base}/api/catalog"><code>catalog</code></a> · <a href="${base}/llms.txt">llms.txt</a></p>
 <h2>Endpoints &amp; pricing</h2>
 <table>

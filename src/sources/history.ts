@@ -26,6 +26,17 @@ function basisColumn(basis: Basis): string {
   return basis === "official" ? "premium_official_pct" : "premium_usdt_pct";
 }
 
+/** A history page ends strictly before this Unix-second cursor. */
+export function historyCursor(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
+/** Cursor for the next older page, based on the oldest timestamp just returned. */
+export function nextHistoryCursor(timestamps: number[], pageIsFull: boolean): string | null {
+  return pageIsFull && timestamps.length ? String(timestamps[timestamps.length - 1]) : null;
+}
+
 export interface HistoryPoint {
   ts: string;
   upbit_krw: number;
@@ -39,28 +50,31 @@ export async function getPremiumHistory(
   symbol: string,
   window?: string,
   maxPoints = 500,
+  before?: unknown,
 ): Promise<{
   symbol: string;
   window: string;
   points: number;
   first_recorded: string | null;
+  next_before: string | null;
   series: HistoryPoint[];
   as_of: string;
 }> {
   const sym = symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
   const { label, seconds } = resolveWindow(window);
   const since = Math.floor(Date.now() / 1000) - seconds;
+  const cursor = historyCursor(before);
   const limit = Math.min(Math.max(maxPoints, 1), 2000);
 
   const { results } = await db
     .prepare(
       `SELECT ts, upbit_krw, global_usd, premium_official_pct, premium_usdt_pct
          FROM premium_snapshots
-        WHERE symbol = ? AND ts >= ?
+        WHERE symbol = ? AND ts >= ? AND (? IS NULL OR ts < ?)
         ORDER BY ts DESC
         LIMIT ?`,
     )
-    .bind(sym, since, limit)
+    .bind(sym, since, cursor, cursor, limit)
     .all<{
       ts: number;
       upbit_krw: number;
@@ -79,6 +93,7 @@ export async function getPremiumHistory(
     window: label,
     points: results.length,
     first_recorded: firstRow?.first_ts ? new Date(firstRow.first_ts * 1000).toISOString() : null,
+    next_before: nextHistoryCursor(results.map(r => r.ts), results.length === limit),
     series: results
       .map(r => ({
         ts: new Date(r.ts * 1000).toISOString(),

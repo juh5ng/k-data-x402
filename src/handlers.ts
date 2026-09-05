@@ -3,7 +3,13 @@ import { getKrwTicker, getKrwMarketsSummary } from "./sources/upbit";
 import { getHeadlines } from "./sources/news";
 import { getUsdKrw } from "./sources/fx";
 import { getPremiumHistory, getPremiumStats } from "./sources/history";
-import { getLatestResearch, getCompanyResearch, getConsensus } from "./sources/research-db";
+import {
+  getLatestResearch,
+  getCompanyResearch,
+  getConsensus,
+  getResearchCoverage,
+  getResearchPreview,
+} from "./sources/research-db";
 
 export interface HandlerEnv {
   ARCHIVE: D1Database;
@@ -61,6 +67,7 @@ export async function runEndpoint(
         str(args.symbol) ?? "BTC",
         str(args.window),
         int(args.points, 500, 1, 2000),
+        str(args.before),
       );
 
     case "/api/kimchi-premium/stats": {
@@ -130,5 +137,29 @@ export async function runEndpoint(
 
     default:
       throw new NotFoundError(`no such endpoint: ${path}`);
+  }
+}
+
+/** Free previews expose coverage and a one-symbol live sample, never paid report content. */
+export async function runPreviewEndpoint(
+  path: string,
+  args: Record<string, unknown>,
+  env: HandlerEnv,
+): Promise<unknown> {
+  switch (path) {
+    case "/api/preview/kimchi-premium":
+      return { preview: true, scope: "BTC only; paid endpoint supports up to 10 symbols", data: await getKimchiPremium(["BTC"]) };
+
+    case "/api/preview/research/coverage":
+      return getResearchCoverage(env.ARCHIVE, int(args.limit, 25, 1, 50));
+
+    case "/api/preview/research/:ticker": {
+      const preview = await getResearchPreview(env.ARCHIVE, str(args.ticker) ?? "");
+      if (!preview) throw new NotFoundError(...NO_COVERAGE);
+      return preview;
+    }
+
+    default:
+      throw new NotFoundError(`no such preview: ${path}`);
   }
 }
