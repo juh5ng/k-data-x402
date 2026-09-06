@@ -44,9 +44,15 @@ $secureKey = Read-Host "Dedicated buyer wallet private key (input is hidden)" -A
 $keyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureKey)
 
 try {
-  $plainKey = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($keyPointer)
+  $plainKey = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($keyPointer).Trim()
+  if ($plainKey -match "^0x[0-9a-fA-F]{40}$") {
+    throw "That is a public Base wallet address, not a private key. Export the private key from a separate dedicated buyer account."
+  }
+  if ($plainKey -match "^[0-9a-fA-F]{64}$") {
+    $plainKey = "0x$plainKey"
+  }
   if ($plainKey -notmatch "^0x[0-9a-fA-F]{64}$") {
-    throw "Expected a 0x-prefixed 32-byte EVM private key."
+    throw "Expected a 32-byte EVM private key: 64 hexadecimal characters, with or without the 0x prefix."
   }
 
   $env:EVM_PRIVATE_KEY = $plainKey
