@@ -31,6 +31,11 @@ if (probe.status !== 402 || !header) {
   process.exit(1);
 }
 const required = JSON.parse(Buffer.from(header, "base64").toString("utf8"));
+const payTo = required.accepts?.[0]?.payTo as string | undefined;
+if (payTo && payTo.toLowerCase() === account.address.toLowerCase()) {
+  console.error("Refusing to pay: the buyer wallet is also the receiving wallet. Use a separate dedicated buyer wallet.");
+  process.exit(1);
+}
 for (const a of required.accepts ?? []) {
   console.log(`Price: ${Number(a.amount) / 1e6} ${a.extra?.name ?? "USDC"} on ${a.network}`);
   console.log(`Pays to: ${a.payTo}`);

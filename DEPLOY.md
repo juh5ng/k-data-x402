@@ -94,20 +94,22 @@ x402 exact 스킴에서 구매자는 EIP-3009 서명만 하고(오프체인), �
 > MetaMask에서 **계정 추가** → 새 주소 생성 → 그 주소로 USDC $1~2를 Base 네트워크로 전송 →
 > **계정 세부정보 → 프라이빗 키 표시**로 그 새 계정의 키만 사용하세요.
 
-빌드:
-
-```bash
-npx.cmd esbuild test/agent-client.ts --bundle --format=esm --platform=node --outfile=.wrangler/agent.mjs
-```
-
-실행 (가장 싼 $0.005 엔드포인트):
+핵심 4개 상품을 한 번씩 정산해 Bazaar 등록을 유도하려면 아래 스크립트를 실행합니다.
+개인키는 숨김 입력으로만 받고, 파일이나 PowerShell 명령 기록에 저장하지 않습니다. 실제 결제 전
+`SPEND 0.34` 확인 문구를 요구하며, 총 결제액은 $0.34입니다.
 
 ```powershell
-$env:EVM_PRIVATE_KEY="0xYOUR_BUYER_KEY"; node .wrangler/agent.mjs https://k-data-x402-production.theblack1022.workers.dev/api/fx/usdkrw
+.\scripts\bootstrap-bazaar.ps1
 ```
 
-정상 동작 시 출력: 결제 요구사항 → 데이터 JSON → 정산 결과 + basescan 트랜잭션 링크.
-수취 지갑에 $0.005 USDC가 들어오면 **"에이전트가 접근하면 수익이 발생한다"가 실증됩니다.**
+결제 없이 현재 Bazaar 노출 상태만 다시 확인할 수도 있습니다.
+
+```powershell
+.\scripts\bootstrap-bazaar.ps1 -CheckOnly
+```
+
+정상 동작 시 각 상품별로 결제 요구사항 → 데이터 JSON → 정산 결과 + Basescan 트랜잭션 링크가
+출력되고, 마지막에 CDP Bazaar 전체 목록을 조회해 현재 발견된 K-Data URL을 표시합니다.
 
 > 이 클라이언트는 잔액 0인 지갑으로 이미 검증했습니다 — 402 파싱, 가격·수취주소 인식까지 정상이고
 > 자금만 있으면 결제가 성립합니다. 실패 시 "지갑에 USDC/가스가 없다"는 안내가 출력됩니다.
