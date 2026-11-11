@@ -5,6 +5,7 @@ export interface FxRate {
   rate: number;
   as_of: string;
   source: string;
+  fetched_at: string;
 }
 
 interface FrankfurterResp {
@@ -25,17 +26,19 @@ export async function getUsdKrw(): Promise<FxRate> {
       const d = await fetchJson<FrankfurterResp>(
         "https://api.frankfurter.dev/v1/latest?base=USD&symbols=KRW",
       );
-      if (!d.rates?.KRW) throw new Error("no KRW rate");
-      return { pair: "USD/KRW" as const, rate: d.rates.KRW, as_of: d.date, source: "frankfurter.dev (ECB)" };
+      if (!d.rates?.KRW || !Number.isFinite(d.rates.KRW) || d.rates.KRW<=0) throw new Error("no KRW rate");
+      return { pair: "USD/KRW" as const, rate: d.rates.KRW, as_of: d.date, source: "frankfurter.dev (ECB)", fetched_at: new Date().toISOString() };
     } catch {
       const d = await fetchJson<ErApiResp>("https://open.er-api.com/v6/latest/USD");
-      if (d.result !== "success" || !d.rates?.KRW) throw new Error("fx: all sources failed");
+      if (d.result !== "success" || !d.rates?.KRW || !Number.isFinite(d.rates.KRW) || d.rates.KRW<=0) throw new Error("fx: all sources failed");
       return {
         pair: "USD/KRW" as const,
         rate: d.rates.KRW,
         as_of: d.time_last_update_utc,
         source: "open.er-api.com",
+        fetched_at: new Date().toISOString(),
       };
     }
   });
 }
+

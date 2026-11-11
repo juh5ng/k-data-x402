@@ -9,6 +9,8 @@
     "deploy": "wrangler deploy",
     "types": "wrangler types",
     "dashboard": "node scripts/dashboard.mjs",
+    "check": "tsc --noEmit",
+    "test:ingestion": "esbuild test/ingestion-suite.ts --bundle --platform=node --format=esm --outfile=.wrangler/ingestion-tests.mjs && node --test .wrangler/ingestion-tests.mjs",
     "test:agent": "node --experimental-strip-types test/agent-client.ts"
   },
   "dependencies": {
@@ -30,3 +32,4 @@
     "wrangler": "^4.0.0"
   }
 }
+

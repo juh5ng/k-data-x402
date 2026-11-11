@@ -7,6 +7,10 @@ export interface KimchiEntry {
   upbit_krw: number;
   global_usd: number;
   global_usd_source: string;
+  upbit_as_of?: string | null;
+  upbit_fetched_at?: string | null;
+  global_as_of?: string | null;
+  global_fetched_at?: string | null;
   /** Global price converted at the official (bank/ECB) USD/KRW rate. */
   global_in_krw_official: number;
   /** Premium vs the official FX rate — the number the press quotes. */
@@ -25,6 +29,10 @@ export interface KimchiReport {
   basis_note: string;
   usdkrw_official: number;
   usdkrw_official_source: string;
+  fx_as_of?: string | null;
+  fx_fetched_at?: string | null;
+  usdt_as_of?: string | null;
+  usdt_fetched_at?: string | null;
   /** Upbit KRW-USDT last price. The gap vs the official rate is the USDT premium. */
   usdkrw_usdt: number | null;
   /** How far Upbit's USDT rate sits above/below the official FX rate, in percent. */
@@ -54,7 +62,7 @@ export async function getKimchiPremium(symbols?: string[]): Promise<KimchiReport
   const usdtKrw = usdtTicker?.price_krw ?? null;
 
   const results = await Promise.all(
-    syms.map(async sym => {
+    syms.map(async (sym): Promise<KimchiEntry | null> => {
       const [krw, usd] = await Promise.all([getKrwTicker(sym), getGlobalUsdPrice(sym)]);
       if (!krw || !usd) return null;
       const officialKrw = usd.price_usd * fx.rate;
@@ -64,6 +72,10 @@ export async function getKimchiPremium(symbols?: string[]): Promise<KimchiReport
         upbit_krw: krw.price_krw,
         global_usd: usd.price_usd,
         global_usd_source: usd.source,
+        upbit_as_of: krw.as_of,
+        upbit_fetched_at: krw.fetched_at,
+        global_as_of: usd.source_as_of,
+        global_fetched_at: usd.fetched_at,
         global_in_krw_official: Math.round(officialKrw),
         premium_official_pct: +((krw.price_krw / officialKrw - 1) * 100).toFixed(3),
         global_in_krw_usdt: usdtBasisKrw ? Math.round(usdtBasisKrw) : 0,
@@ -78,12 +90,17 @@ export async function getKimchiPremium(symbols?: string[]): Promise<KimchiReport
     description:
       "Kimchi premium: Upbit (KRW) price vs global USD price, reported on two conversion bases.",
     basis_note:
-      "premium_official_pct uses the official USD/KRW rate (the quoted figure). premium_usdt_pct uses Upbit's own KRW/USDT rate and is the margin actually realizable, because the KRW exit leg goes through USDT rather than banks. Neither figure is net of trading or transfer fees.",
+      "premium_official_pct uses the reference USD/KRW rate. premium_usdt_pct uses Upbit's KRW/USDT rate. Both are gross spot-price comparisons, not executable returns; spreads, fees, liquidity and transfer constraints are excluded.",
     usdkrw_official: fx.rate,
     usdkrw_official_source: fx.source,
+    fx_as_of: fx.as_of,
+    fx_fetched_at: fx.fetched_at,
+    usdt_as_of: usdtTicker?.as_of ?? null,
+    usdt_fetched_at: usdtTicker?.fetched_at ?? null,
     usdkrw_usdt: usdtKrw,
     usdt_premium_pct: usdtKrw ? +((usdtKrw / fx.rate - 1) * 100).toFixed(3) : null,
     entries: results.filter((e): e is KimchiEntry => e !== null),
     as_of: new Date().toISOString(),
   };
 }
+
