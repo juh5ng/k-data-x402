@@ -31,6 +31,7 @@ export interface KrwTicker {
   low_24h_krw: number;
   volume_24h_krw: number;
   as_of: string;
+  fetched_at: string;
 }
 
 async function marketIndex(): Promise<Map<string, UpbitMarket>> {
@@ -53,6 +54,7 @@ function normalize(t: UpbitTicker, names: Map<string, UpbitMarket>): KrwTicker {
     low_24h_krw: t.low_price,
     volume_24h_krw: Math.round(t.acc_trade_price_24h),
     as_of: new Date(t.timestamp).toISOString(),
+    fetched_at: new Date().toISOString(),
   };
 }
 
@@ -99,3 +101,4 @@ export async function getKrwMarketsSummary(limit = 30): Promise<{
     top_losers: byChange.slice(-10).reverse(),
   };
 }
+

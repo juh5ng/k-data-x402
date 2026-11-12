@@ -1,0 +1,37 @@
+name: Ingestion checks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ingestion-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_SEND_METRICS: "false"
+      WRANGLER_SEND_METRICS: "false"
+      CI: "true"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24.22.0"
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test:ingestion
+      - name: Preview and history regression tests
+        run: |
+          npx --no-install esbuild test/preview-and-history.test.ts --bundle --platform=node --format=esm --outfile=.wrangler/preview-tests.mjs
+          node --test .wrangler/preview-tests.mjs
+      - name: Production Worker bundle (dry-run only)
+        run: npx --no-install wrangler deploy --env production --dry-run --outdir .wrangler/ci-dry-run

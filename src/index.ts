@@ -23,9 +23,12 @@ import { runResearchTick } from "./research";
 import { recordReceipt, ensureReceiptsSchema } from "./receipts";
 import { runEndpoint, runPreviewEndpoint, NotFoundError } from "./handlers";
 import { handleMcpRequest } from "./mcp";
+import { runDartTick } from './dart';
 
 /** Must match the hourly entry in wrangler.jsonc triggers.crons. */
 const RESEARCH_CRON = "7 * * * *";
+// Optional trigger; not added to wrangler.jsonc until the pilot is configured.
+const DART_CRON = "17 8 * * 1-5";
 
 interface Env {
   NETWORK: string; // "eip155:84532" (Base Sepolia) or "eip155:8453" (Base mainnet)
@@ -36,6 +39,9 @@ interface Env {
   CDP_API_KEY_SECRET?: string;
   ARCHIVE: D1Database;
   AI: Ai;
+  DART_ENABLED?: string;
+  DART_API_KEY?: string;
+  DART_CORP_CODES?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -388,6 +394,12 @@ export default {
    * interval, not the schedule.
    */
   async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    if (event.cron === DART_CRON) {
+      ctx.waitUntil(runDartTick(env.ARCHIVE,env,{scheduledAt:event.scheduledTime}).catch(() => {
+        console.error('dart: collection failed; inspect collector_runs error_code');
+      }));
+      return;
+    }
     if (event.cron === RESEARCH_CRON) {
       ctx.waitUntil(
         (async () => {
@@ -411,7 +423,7 @@ export default {
           // Created here as well as lazily on the payment path, so the ledger
           // exists — and reads as an honest zero — before the first sale.
           await ensureReceiptsSchema(env.ARCHIVE);
-          const rows = await recordSnapshot(env.ARCHIVE);
+          const rows = await recordSnapshot(env.ARCHIVE, { scheduledAt: event.scheduledTime });
           console.log(`archive: recorded ${rows} rows`);
         } catch (err) {
           console.error("archive: snapshot failed:", err);
@@ -420,3 +432,4 @@ export default {
     );
   },
 } satisfies ExportedHandler<Env>;
+
